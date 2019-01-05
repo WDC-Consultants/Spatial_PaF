@@ -1,0 +1,22 @@
+---
+title: "Spatio-Temporal Forecasting"
+author: "Akbar Akbari Esfahani"
+date: "1/4/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Background
+
+In my time as a data scientist I have done my fair share of crazy interviews, specially in the early days of Data Science. This blog is about one of those crazy silicone valley challenges. I was given a set of data and two tasks to complete in 24 hours.  
+  
+The challenge, predict the temprature for sites that have no prior data available. To better understand this challenge, I was given 500 temprature reading from sites surrounding the 50 "blind" sites. This automatically puts in the realm of not just a temporal problem to forecast some given data, but a forecast with a complex spatial problem.
+
+# The Challenge
+
+1. Write a program that learns from the training data to predict temperatures at later dates, from January 1, 2011 to December 31, 2011.  
+2. Write a program that predicts the temperature every day from January 1, 2011 to December 31, 2011 for the 50 new locations (blind data).
+3. Write a program to validate any model(s)
