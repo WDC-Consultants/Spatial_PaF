@@ -2,7 +2,17 @@
 title: "Spatio-Temporal Forecasting"
 author: "Akbar Akbari Esfahani"
 date: "1/4/2019"
-output: html_document
+categories: ["Forecasting"]
+tags: ["spatial statistics", "time-series", "kriging", "forecasting"]
+type: "post"
+cover: "/img/cover.jpg"
+weight: 1
+output:
+  prettydoc::html_pretty:
+    smooth_scroll: true
+    collapsed: false
+    highlight: tango
+    theme: cayman
 ---
 
 ```{r setup, include=FALSE}
@@ -11,12 +21,133 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Background
 
-In my time as a data scientist I have done my fair share of crazy interviews, specially in the early days of Data Science. This blog is about one of those crazy silicone valley challenges. I was given a set of data and two tasks to complete in 24 hours.  
+Imagine you have a dataset that consists for some time-series data with the spatial point location they were taken at. Then you are given some other spatial point locations and are asked to predict what happens and what will happen at these new locations for which you don't have any other data. What now? (you still have to create a prediction for those locations)
+
+# Spatial Statistics and Spatial Interpolation
+
+To answer the question of "What now?" we will have to rely on one the aspects of Statistics that many overlook that has more value than most realize. We will be using something called [Kriging](https://msu.edu/~ashton/classes/866/papers/gatrell_ordkrige.pdf) which is a spatial interpolation method making use of the covariance between know data locations and unknown data locations.
+
+# Today's task
+
+* Write a program that learns from the training data to predict temperatures at later dates, from January 1, 2011 to December 31, 2011.  
+
+* 2. Write a program that predicts the temperature every day from January 1, 2011 to December 31, 2011 for the 50 new locations (blind data).  
+
+* 3. Write a program to validate any model(s)  
+
+### The data
+
+* We have three data sets,  
+  1. Temperature reading from 500 sites for 30 years   
+  2. The spatial locations of the 500 readings  
+  3. The spatial locations of 50 blind locations  
   
-The challenge, predict the temprature for sites that have no prior data available. To better understand this challenge, I was given 500 temprature reading from sites surrounding the 50 "blind" sites. This automatically puts in the realm of not just a temporal problem to forecast some given data, but a forecast with a complex spatial problem.
+# Part 1
 
-# The Challenge
+In part 1, we will read in all the data and join the temperature readings with their corresponding locations  
 
-1. Write a program that learns from the training data to predict temperatures at later dates, from January 1, 2011 to December 31, 2011.  
-2. Write a program that predicts the temperature every day from January 1, 2011 to December 31, 2011 for the 50 new locations (blind data).
-3. Write a program to validate any model(s)
+### Data Ingestion and data overview
+
+```{r dataIngestion, message=FALSE}
+# Required packages
+library(tidyverse)
+library(readxl)
+library(sp)
+library(data.table)
+library(gstat)
+library(maptools)
+library(leaflet)
+library(forecast)
+library(timetk)
+library(tidyquant)
+library(sweep)
+
+# load data
+### temperature data  
+train_dat <- read_csv("data/src/training.csv")
+
+### locations data of temperature data  
+coords <- read_excel("data/src/locations.xlsx")
+
+### location of unkown data  
+coords_blnd <- read_excel("data/src/blindLoc.xlsx")
+
+# check data structure
+train_dat %>%
+  select(dates, location_1, location_2, location_3, location_4, location_5) %>%
+     head(5)
+
+train_dat %>%
+     summarise(time_start = min(dates), time_end = max(dates))
+```
+
+### Map of location data
+
+```{r mappingLocations}
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addCircles(coords$long, coords$lat, popup=paste(coords$county, "county, ", coords$state), color = "#6A8A82") %>% 
+  addCircles(coords_blnd$long, coords_blnd$lat, popup = paste(coords_blnd$county, "county,", coords_blnd$state), color = "#A7414A")
+```
+
+### Data transformation and join
+
+For step 1 (spatial interpolation) we need to transpose the temprature data in order to match it with their location data  
+
+```{r dataTransformation, message=FALSE}
+# transpose 
+train_main <- train_dat %>%
+     select(-dates) %>%
+     transpose() %>%
+     mutate(location = names(train_dat[-1])) %>%
+     as_tibble() %>%
+     left_join(coords)
+
+# Adding coordinate system to data
+
+coordinates(train_main) <- ~ lat + long
+coordinates(coords_blnd) <- ~ lat + long
+```
+
+## Spatial Prediction
+
+```{r kriging}
+# Creating variables
+pred <- matrix(nrow = 50, ncol = 11323)
+vari <- matrix(nrow = 50, ncol = 11323)
+
+# Performing Spatial interpolation using Kriging and predicting 30 years of data for 50 new location
+for (i in seq_along(1:11323)) {  
+  kr_formula <- as.formula(paste(names(train_main)[i], " ~ lat+long"))
+  krig_pred <- krige(kr_formula, train_main, blind)
+  pred[,i] <- krig_pred$var1.pred
+  vari[,i] <- krig_pred$var1.var
+}
+```
+
+# Part 2
+
+### Forecast 500 known location tempratures for one year
+
+```{r forecastKnown}
+# change data to a ts object
+main_frcst <- matrix(NA, nrow = 365, ncol = 500)
+acc_frcst <- tibble()
+
+# 
+for (i in 1:500) { 
+  x <- train_dat[,i]
+  y <- ts(x, frequency=7)
+  z <- fourier(ts(x, frequency=365.25), K=5)
+  zf <- fourier(ts(x, frequency=365.25), K=5, h=365)
+  fit <- auto.arima(y, xreg=z, seasonal=FALSE) 
+  pred = forecast(fit, xreg = zf, h = 365)
+  main_frcst[,i] = pred$mean
+  acc_frcst[i,] = accuracy(fit)
+}
+
+```
+
+
+
+

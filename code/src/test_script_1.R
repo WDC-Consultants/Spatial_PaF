@@ -1,10 +1,8 @@
 
-# Step 1. Forecast know locations ---------------------------------------------------------------------------------
+# Data Managment --------------------------------------------------------------------------------------------------
 
 library(tidyverse)
-library(forecast)
 library(readxl)
-library(sf)
 library(sp)
 library(data.table)
 
