@@ -29,11 +29,11 @@ To answer the question of "What now?" we will have to rely on one the aspects of
 
 # Today's task
 
-* Write a program that learns from the training data to predict temperatures at later dates, from January 1, 2011 to December 31, 2011.  
+* Write a program that learns from the training data to predict temperatures at later dates, from January 1, 2011 to December 31, 2011 = 365 days.  
 
-* 2. Write a program that predicts the temperature every day from January 1, 2011 to December 31, 2011 for the 50 new locations (blind data).  
+* Write a program that predicts the temperature every day from January 1, 2011 to December 31, 2011 for the 50 new locations (blind data).  
 
-* 3. Write a program to validate any model(s)  
+* Write a program to validate any model(s)  
 
 ### The data
 
@@ -119,10 +119,17 @@ vari <- matrix(nrow = 50, ncol = 11323)
 # Performing Spatial interpolation using Kriging and predicting 30 years of data for 50 new location
 for (i in seq_along(1:11323)) {  
   kr_formula <- as.formula(paste(names(train_main)[i], " ~ lat+long"))
-  krig_pred <- krige(kr_formula, train_main, blind)
+  krig_pred <- krige(kr_formula, train_main, coords_blnd)
   pred[,i] <- krig_pred$var1.pred
   vari[,i] <- krig_pred$var1.var
 }
+
+# save prediction as a tibble and rename columns with proper location title
+blnd_pred <- as.tibble(t(pred))
+blnd_vrnc <- as.tibble(vari)
+colnames(blnd_pred) <- coords_blnd@data$location
+write_csv(blnd_pred, "data/blind_krige_pred.csv")
+write_csv(blnd_vrnc, "data/krige_variance.csv")
 ```
 
 # Part 2
@@ -132,11 +139,11 @@ for (i in seq_along(1:11323)) {
 ```{r forecastKnown}
 # change data to a ts object
 main_frcst <- matrix(NA, nrow = 365, ncol = 500)
-acc_frcst <- tibble()
+acc_frcst <- matrix(NA, nrow = 500, ncol = 7)
 
-# 
+# Forecast each location in a loop
 for (i in 1:500) { 
-  x <- train_dat[,i]
+  x <- train_dat[,i+1]
   y <- ts(x, frequency=7)
   z <- fourier(ts(x, frequency=365.25), K=5)
   zf <- fourier(ts(x, frequency=365.25), K=5, h=365)
@@ -146,8 +153,35 @@ for (i in 1:500) {
   acc_frcst[i,] = accuracy(fit)
 }
 
+frcst_dat <- as.tibble(main_frcst)
+frcst_acc <- as.tibble(acc_frcst)
+write_csv(frcst_dat, "data/forecasted_main.csv")
+write_csv(frcst_acc, "data/forecast_accuracy_main.csv")
 ```
 
+### Forecast 50 unkown location based on kriging results
+
+```{r}
+blnd_frcst <- matrix(NA, nrow = 365, ncol = 50)
+blnd_acc <- matrix(NA, nrow = 50, ncol = 7)
+
+# Forecast each location in a loop
+for (i in 1:50) { 
+  x <- blnd_pred[,i]
+  y <- ts(x, frequency=7)
+  z <- fourier(ts(x, frequency=365.25), K=5)
+  zf <- fourier(ts(x, frequency=365.25), K=5, h=365)
+  fit <- auto.arima(y, xreg=z, seasonal=FALSE) 
+  pred = forecast(fit, xreg = zf, h = 365)
+  blnd_frcst[,i] = pred$mean
+  blnd_accft[i,] = accuracy(fit)
+}
+
+frcst_blnd <- as.tibble(blnd_frcst)
+blnd_acc <- as.tibble(blnd_accft)
+write_csv(frcst_blnd, "data/forecasted_blind.csv")
+write_csv(blnd_acc, "data/forecast_accuracy_blind.csv")
+```
 
 
 
