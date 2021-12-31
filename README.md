@@ -16,3 +16,14 @@ This project is about predicting climate data at unkown locations which requires
 │   └── verify forecast  
 ├── Create Map to display  
 └── Publish Map  
+
+```flow
+st=>start: Start
+op=>operation: Your Operation
+cond=>condition: Yes or No?
+e=>end
+
+st->op->cond
+cond(yes)->e
+cond(no)->op
+```
